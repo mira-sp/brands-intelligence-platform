@@ -56,6 +56,15 @@ class Settings(BaseSettings):
     sentiment_model_path: str = "./ml/models/sentiment_model"
     crisis_model_path: str = "./ml/models/crisis_model"
 
+    # AI visibility monitor
+    # Optional: without it the Anthropic SDK falls back to the ANTHROPIC_API_KEY env var / `ant` profile
+    anthropic_api_key: str = ""
+    visibility_model: str = "claude-opus-5-5"         # the assistant whose answers we monitor
+    visibility_judge_model: str = "claude-opus-5-5"   # analyses the answers (claude-haiku-5-5 is far cheaper)
+    visibility_web_search: bool = True                # mimic assistants that browse the web
+    visibility_max_prompts: int = 50                  # per brand - every prompt costs credits per run
+    visibility_concurrency: int = 4
+
     # Input limits (DoS protection for ML endpoints)
     max_text_length: int = 10_000
     max_batch_size: int = 100

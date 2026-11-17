@@ -16,6 +16,7 @@ import uuid
 from .api import brands, mentions, analytics, demo
 from .api.auth import router as auth_router
 from .api.ml import router as ml_router
+from .api.visibility import router as visibility_router
 from .core.rate_limit import RateLimitMiddleware
 
 app = FastAPI(
@@ -109,6 +110,7 @@ app.include_router(mentions.router)
 app.include_router(analytics.router)
 app.include_router(demo.router)
 app.include_router(ml_router)
+app.include_router(visibility_router)
 
 if __name__ == "__main__":
     import uvicorn

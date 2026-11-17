@@ -7,6 +7,7 @@ from .database import engine, Base, AsyncSessionLocal
 from ..models.brand import Brand
 from ..models.mention import Mention
 from ..models.user import User
+from ..models import visibility as _visibility_models  # noqa: F401 - registers the visibility tables
 from .config import settings
 import uuid
 from datetime import datetime, timedelta
