@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .database import engine, Base, AsyncSessionLocal
 from ..models.brand import Brand
 from ..models.mention import Mention
+from ..models.user import User
+from .config import settings
 import uuid
 from datetime import datetime, timedelta
 
@@ -20,6 +22,27 @@ async def create_tables():
     except Exception as e:
         logger.error(f"Failed to create tables: {e}")
         raise
+
+async def create_admin_user():
+    """Create the first admin from ADMIN_EMAIL / ADMIN_PASSWORD if no users exist yet."""
+    from .security import hash_password
+
+    async with AsyncSessionLocal() as session:
+        if (await session.execute(select(User).limit(1))).scalar_one_or_none():
+            return
+        if not settings.admin_email or not settings.admin_password:
+            logger.warning("No users exist. Set ADMIN_EMAIL and ADMIN_PASSWORD and re-run init_db to create an admin.")
+            return
+        if len(settings.admin_password) < 12:
+            raise ValueError("ADMIN_PASSWORD must be at least 12 characters")
+        session.add(User(
+            email=settings.admin_email.strip().lower(),
+            hashed_password=hash_password(settings.admin_password),
+            role="admin",
+        ))
+        await session.commit()
+        logger.info("Initial admin user created")
+
 
 async def create_sample_data():
     """Create sample data with real ML analysis"""
@@ -140,6 +163,7 @@ async def init_database():
     try:
         logger.info("Starting database initialization...")
         await create_tables()
+        await create_admin_user()
         await create_sample_data()
         logger.info("Database initialization completed successfully")
     except Exception as e:

@@ -1,43 +1,43 @@
-# Frontend Dockerfile - React + Tailwind Dashboard
+# Frontend Dockerfile - Next.js dashboard
 # Multi-stage build for both development and production
 
 # ---- Base Stage ----
-FROM node:23-alpine AS base
+# Node 22 = current LTS (23 is a short-lived odd release, already end-of-life)
+FROM node:22-alpine AS base
 WORKDIR /app
-# Add package files for more efficient caching
 COPY package.json package-lock.json* ./
 
 # ---- Development Stage ----
 FROM base AS development
-# Install dependencies (including dev dependencies)
 RUN npm ci
-# Copy the rest of the code
 COPY . .
-# Expose port
 EXPOSE 3000
-# Start the development server
 CMD ["npm", "run", "dev"]
 
 # ---- Build Stage ----
 FROM base AS builder
-# Install dependencies
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm ci
-# Copy the rest of the code
 COPY . .
-# Build the application
 RUN npm run build
 
 # ---- Production Stage ----
-FROM nginx:23-alpine AS production
-# Copy built artifacts from build stage
-COPY --from=builder /app/out /usr/share/nginx/html
-# Copy custom nginx configuration if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-# Expose port
-EXPOSE 80
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
-
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Runs the Next.js standalone server (so the security headers in next.config.ts apply)
+# as an unprivileged user, with only the build output - no source or dev dependencies.
+FROM node:22-alpine AS production
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+USER nextjs
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
+CMD ["node", "server.js"]

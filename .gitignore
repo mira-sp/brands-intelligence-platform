@@ -62,7 +62,7 @@ pip-delete-this-directory.txt
 .pytest_cache/
 
 # Docker
-.dockerignore
+# (.dockerignore must be committed - it keeps .env out of images)
 
 # Database
 *.db

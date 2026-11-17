@@ -1,0 +1,102 @@
+# infrastructure/docker/docker-compose.prod.yml
+# Production stack. Requires infrastructure/docker/.env (see .env.example).
+# backend/frontend are bound to 127.0.0.1 - put a TLS-terminating reverse proxy
+# (nginx, Caddy, Traefik) in front of them. Postgres/Redis are not published at all.
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    <<: *hardening
+    image: postgres:15
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      POSTGRES_DB: brand_intelligence
+      POSTGRES_USER: brand_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brand_app -d brand_intelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    <<: *hardening
+    image: redis:7-alpine
+    cap_add: [CHOWN, SETGID, SETUID]
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env} --rename-command FLUSHALL "" --rename-command CONFIG ""
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+
+  backend:
+    <<: *hardening
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - backend_logs:/app/logs
+      - model_cache:/app/model_cache
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DEBUG=false
+      - SQL_ECHO=false
+      - SECRET_KEY=${SECRET_KEY:?set SECRET_KEY in .env}
+      - API_KEY=${API_KEY:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      - DATABASE_URL=postgresql+asyncpg://brand_app:${POSTGRES_PASSWORD}@postgres:5432/brand_intelligence
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      # Only trust X-Forwarded-For from your reverse proxy, as seen from inside the
+      # container (host proxy -> usually the Docker bridge gateway, e.g. 172.17.0.1).
+      # Without this, rate limiting sees every client as the proxy's IP. Never use "*".
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
+      - HF_HOME=/app/model_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [internal, public]
+
+  frontend:
+    <<: *hardening
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set NEXT_PUBLIC_API_URL in .env}
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1001,gid=1001
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    networks: [public]
+
+networks:
+  internal:
+    internal: true
+  public:
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_logs:
+  model_cache:

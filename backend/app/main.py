@@ -13,24 +13,47 @@ import uuid
 
 # Import API routers
 from .api import brands, mentions, analytics, demo
+from .api.auth import router as auth_router
 from .api.ml import router as ml_router
+from .core.rate_limit import RateLimitMiddleware
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
-    debug=settings.debug
+    debug=settings.debug,
+    # Don't expose interactive API docs / OpenAPI schema outside debug mode
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
-# CORS middleware for frontend
+# Middleware order: the LAST one added runs FIRST (outermost).
+# Request flow: CORS -> security headers -> rate limit -> routes, so 429s still get CORS + headers.
+
+# Per-IP rate limiting (stricter for /auth/token and /ml)
+app.add_middleware(RateLimitMiddleware)
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
+# CORS middleware for frontend (origins configured via CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
 # Include API routers
+app.include_router(auth_router)
 app.include_router(brands.router)
 app.include_router(mentions.router)
 app.include_router(analytics.router)
@@ -86,4 +109,4 @@ async def get_sample_data(db: AsyncSession = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

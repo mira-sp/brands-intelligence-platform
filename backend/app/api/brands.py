@@ -6,6 +6,7 @@ from typing import List
 import uuid
 
 from ..core.database import get_db
+from ..core.security import require_role
 from ..models.brand import Brand
 from ..schemas.brand import Brand as BrandSchema, BrandCreate
 
@@ -19,7 +20,7 @@ async def get_brands(db: AsyncSession = Depends(get_db)):
     brands = result.scalars().all()
     return brands
 
-@router.post("/", response_model=BrandSchema)
+@router.post("/", response_model=BrandSchema, dependencies=[Depends(require_role("admin", "analyst"))])
 async def create_brand(brand: BrandCreate, db: AsyncSession = Depends(get_db)):
     """Create a new brand"""
     db_brand = Brand(**brand.dict())

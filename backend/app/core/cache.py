@@ -9,6 +9,20 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _redact_url(url: str) -> str:
+    """Hide credentials (user:password@) in connection URLs before logging."""
+    from urllib.parse import urlsplit, urlunsplit
+    try:
+        parts = urlsplit(url)
+        if parts.username or parts.password:
+            netloc = f"***@{parts.hostname}" + (f":{parts.port}" if parts.port else "")
+            return urlunsplit(parts._replace(netloc=netloc))
+        return url
+    except Exception:
+        return "<redacted>"
+
+
 class CacheService:
     """Redis-based caching service for ML inference results and API responses"""
     
@@ -20,7 +34,7 @@ class CacheService:
     def _connect(self):
         """Connect to Redis server"""
         try:
-            redis_url = getattr(settings, 'REDIS_URL', 'redis://localhost:6379/0')
+            redis_url = settings.redis_url
             self.redis_client = redis.from_url(
                 redis_url,
                 encoding="utf-8",
@@ -29,9 +43,9 @@ class CacheService:
                 socket_connect_timeout=5,
                 retry_on_timeout=True
             )
-            logger.info(f"Redis cache service initialized: {redis_url}")
+            logger.info("Redis cache service initialized: %s", _redact_url(redis_url))
         except Exception as e:
-            logger.warning(f"Redis connection failed: {e}. Caching disabled.")
+            logger.warning("Redis connection failed (%s). Caching disabled.", type(e).__name__)
             self.redis_client = None
     
     def _generate_cache_key(self, prefix: str, data: Any) -> str:
@@ -41,7 +55,7 @@ class CacheService:
         else:
             hash_input = json.dumps(data, sort_keys=True)
         
-        hash_obj = hashlib.md5(hash_input.encode())
+        hash_obj = hashlib.sha256(hash_input.encode())
         return f"{prefix}:{hash_obj.hexdigest()}"
     
     async def is_available(self) -> bool:
@@ -153,10 +167,11 @@ class CacheService:
             return 0
         
         try:
-            keys = await self.redis_client.keys(pattern)
-            if keys:
-                return await self.redis_client.delete(*keys)
-            return 0
+            # SCAN instead of KEYS: KEYS blocks the whole Redis server on large keyspaces
+            deleted = 0
+            async for key in self.redis_client.scan_iter(match=pattern, count=500):
+                deleted += await self.redis_client.delete(key)
+            return deleted
         except Exception as e:
             logger.warning(f"Cache pattern invalidation error for {pattern}: {e}")
             return 0
@@ -181,7 +196,7 @@ class CacheService:
             }
         except Exception as e:
             logger.warning(f"Cache stats error: {e}")
-            return {"available": False, "error": str(e)}
+            return {"available": False}
     
     async def close(self):
         """Close Redis connection"""

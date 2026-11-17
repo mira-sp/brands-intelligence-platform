@@ -7,9 +7,9 @@ services:
     environment:
       POSTGRES_DB: brand_intelligence
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: brandpass123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +21,8 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
+      - "127.0.0.1:6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     volumes:
       - redis_data:/var/lib/redis/data
 
@@ -35,8 +35,11 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=true
-      - DATABASE_URL=postgresql+asyncpg://postgres:brandpass123@postgres:5432/brand_intelligence
-      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/brand_intelligence
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
     volumes:
       - ../../backend:/app
     depends_on:
@@ -57,7 +60,7 @@ services:
       - ../../frontend:/app
       - /app/node_modules
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
 

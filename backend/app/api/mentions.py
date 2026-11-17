@@ -15,9 +15,9 @@ router = APIRouter()
 @router.get("/", response_model=List[MentionSchema])
 async def get_mentions(
     brand_id: Optional[uuid.UUID] = None,
-    platform: Optional[str] = None,
-    days: int = Query(7, description="Number of days to look back"),
-    limit: int = Query(100, le=1000),
+    platform: Optional[str] = Query(None, max_length=50),
+    days: int = Query(7, ge=1, le=365, description="Number of days to look back"),
+    limit: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db)
 ):
     """Get mentions with filtering options"""
@@ -45,7 +45,7 @@ async def get_mentions(
 @router.get("/crisis-alerts", response_model=List[MentionSchema])
 async def get_crisis_alerts(
     brand_id: Optional[uuid.UUID] = None,
-    threshold: float = Query(0.7, description="Crisis probability threshold"),
+    threshold: float = Query(0.7, ge=0.0, le=1.0, description="Crisis probability threshold"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get high-risk mentions that might indicate a crisis"""
@@ -64,7 +64,7 @@ async def get_crisis_alerts(
 @router.get("/analytics/sentiment-trend")
 async def get_sentiment_trend(
     brand_id: uuid.UUID,
-    days: int = Query(30),
+    days: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db)
 ):
     """Get sentiment trend over time"""

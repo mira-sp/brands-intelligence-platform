@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/sentiment-overview")
 async def get_sentiment_overview(
     brand_id: uuid.UUID,
-    days: int = Query(7, description="Number of days to analyze"),
+    days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get sentiment analysis overview for a brand"""
@@ -49,7 +49,7 @@ async def get_sentiment_overview(
 @router.get("/platform-breakdown")
 async def get_platform_breakdown(
     brand_id: uuid.UUID,
-    days: int = Query(30),
+    days: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db)
 ):
     """Get mention distribution by platform"""
@@ -86,7 +86,7 @@ async def get_platform_breakdown(
 @router.get("/crisis-metrics")
 async def get_crisis_metrics(
     brand_id: uuid.UUID,
-    threshold: float = Query(0.7, description="Crisis probability threshold"),
+    threshold: float = Query(0.7, ge=0.0, le=1.0, description="Crisis probability threshold"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get crisis detection metrics"""

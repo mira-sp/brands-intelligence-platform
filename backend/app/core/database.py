@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 if "sqlite" in settings.database_url.lower():
     engine = create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=settings.sql_echo,
         connect_args={"check_same_thread": False}
     )
 else:
     engine = create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=settings.sql_echo,
         pool_size=20,
         max_overflow=0
     )
