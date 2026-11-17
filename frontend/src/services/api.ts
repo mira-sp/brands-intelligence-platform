@@ -29,7 +29,7 @@ export interface SentimentAnalysis {
   crisis_probability: number;
   urgency_score: number;
   crisis_indicators: number;
-  model_info: any;
+  model_info: Record<string, unknown>;
 }
 
 export interface CrisisAlert {
@@ -162,7 +162,7 @@ class ApiService {
     return response.json();
   }
 
-  async reanalyzeMention(mentionId: string): Promise<any> {
+  async reanalyzeMention(mentionId: string): Promise<Record<string, unknown>> {
     const response = await this.request(`/api/mentions/${encodeURIComponent(mentionId)}/reanalyze`, {
       method: 'POST'
     });
@@ -170,7 +170,7 @@ class ApiService {
     return response.json();
   }
 
-  async getModelInfo(): Promise<any> {
+  async getModelInfo(): Promise<Record<string, unknown>> {
     const response = await this.request(`/api/ml/model-info`);
     if (!response.ok) throw new Error('Failed to fetch model info');
     return response.json();

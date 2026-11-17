@@ -53,7 +53,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Brand Intelligence Dashboard</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Monitor your brand's online presence and sentiment in real-time.
+            Monitor your brand&apos;s online presence and sentiment in real-time.
           </p>
         </div>
 

@@ -75,3 +75,5 @@ pip-delete-this-directory.txt
 # Temporary files
 *.tmp
 *.temp
+# TypeScript incremental build info
+*.tsbuildinfo

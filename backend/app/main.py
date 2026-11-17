@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from .core.database import get_db
 from .core.config import settings
+from .core.security import require_user
 from .models.brand import Brand
 from .models.mention import Mention
 from typing import List
@@ -52,15 +53,8 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
-# Include API routers
-app.include_router(auth_router)
-app.include_router(brands.router)
-app.include_router(mentions.router)
-app.include_router(analytics.router)
-app.include_router(demo.router)
-app.include_router(ml_router)
-
-# Basic health check
+# Public endpoints (no auth) - registered BEFORE the routers so router paths such as
+# "/{mention_id}" can't shadow them.
 @app.get("/")
 async def read_root():
     return {
@@ -78,20 +72,20 @@ async def health_check():
         "ml_service": "available"
     }
 
-# Basic data endpoints
-@app.get("/api/brands")
+# Basic data endpoints (require a logged-in user)
+@app.get("/api/brands", dependencies=[Depends(require_user)])
 async def get_brands(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Brand).limit(10))
     brands = result.scalars().all()
     return [{"id": brand.id, "name": brand.name, "industry": brand.industry} for brand in brands]
 
-@app.get("/api/mentions")
+@app.get("/api/mentions", dependencies=[Depends(require_user)])
 async def get_mentions(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Mention).limit(10))
     mentions = result.scalars().all()
     return [{"id": mention.id, "content": mention.content, "platform": mention.platform, "sentiment_score": mention.sentiment_score} for mention in mentions]
 
-@app.get("/api/demo/sample-data")
+@app.get("/api/demo/sample-data", dependencies=[Depends(require_user)])
 async def get_sample_data(db: AsyncSession = Depends(get_db)):
     # Get brands
     brands_result = await db.execute(select(Brand))
@@ -106,6 +100,15 @@ async def get_sample_data(db: AsyncSession = Depends(get_db)):
         "mentions": [{"id": m.id, "content": m.content, "sentiment_score": m.sentiment_score} for m in mentions],
         "message": "Sample data loaded successfully!"
     }
+
+
+# Include API routers (after the app-level routes above)
+app.include_router(auth_router)
+app.include_router(brands.router)
+app.include_router(mentions.router)
+app.include_router(analytics.router)
+app.include_router(demo.router)
+app.include_router(ml_router)
 
 if __name__ == "__main__":
     import uvicorn

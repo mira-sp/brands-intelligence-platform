@@ -7,10 +7,12 @@ from datetime import datetime, timedelta
 import uuid
 
 from ..core.database import get_db
+from ..core.security import require_user
 from ..models.mention import Mention
 from ..schemas.mention import Mention as MentionSchema
 
-router = APIRouter()
+# All endpoints in this router require a logged-in user (JWT) or the service API key
+router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/", response_model=List[MentionSchema])
 async def get_mentions(

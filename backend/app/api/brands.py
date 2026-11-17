@@ -6,11 +6,12 @@ from typing import List
 import uuid
 
 from ..core.database import get_db
-from ..core.security import require_role
+from ..core.security import require_role, require_user
 from ..models.brand import Brand
 from ..schemas.brand import Brand as BrandSchema, BrandCreate
 
-router = APIRouter()
+# All endpoints in this router require a logged-in user (JWT) or the service API key
+router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/", response_model=List[BrandSchema])
 async def get_brands(db: AsyncSession = Depends(get_db)):

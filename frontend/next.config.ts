@@ -24,6 +24,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Pin the tracing root to this folder so a lockfile higher up the tree can't
+  // change the standalone layout (server.js must land in .next/standalone/).
+  outputFileTracingRoot: __dirname,
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

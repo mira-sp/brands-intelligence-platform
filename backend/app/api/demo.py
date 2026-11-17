@@ -1,11 +1,14 @@
 # backend/app/api/demo.py
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from ..core.security import require_user
 from typing import Dict, Any
 import uuid
 from datetime import datetime, timedelta
 import random
 
-router = APIRouter()
+# All endpoints in this router require a logged-in user (JWT) or the service API key
+router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/sample-data")
 async def get_sample_data() -> Dict[str, Any]:
