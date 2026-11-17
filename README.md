@@ -1,281 +1,167 @@
-# Brand Intelligence Platform
+# Brand Intelligence Platform: AI Visibility Monitor
 
-Eine Enterprise-Level Plattform, die Social Media, News und Review-Daten in Echtzeit analysiert, um Marken vor Reputationskrisen zu schützen und Marktchancen zu identifizieren
+**Know what AI assistants tell your customers about your brand.**
 
-###  **Phase 3 Complete - Advanced ML Integration**
+More and more people ask ChatGPT, Claude, Perplexity or Gemini *"Which CRM should I use?"* or *"Best hotel in Munich for families?"* instead of searching Google. If the assistants don't mention your brand, or describe it wrongly, you lose customers without ever seeing it in your analytics.
 
-- **Backend API**: FastAPI with SQLite database + 9 ML endpoints
-- **Frontend Dashboard**: Next.js React app running on port 3000
-- **Database**: SQLite with sample brands and mentions data
-- **ML Pipeline**: BERT sentiment analysis + crisis detection operational
-- **Real-time Processing**: Async ML analysis with batch processing
--  **API Endpoints**: 13 total endpoints including 9 ML-specific endpoints
-- **BERT Integration**: nlptown/bert-base-multilingual-uncased-sentiment (669MB model)
-- **Crisis Detection**: Multi-level threat assessment with keyword matching
+This platform tracks that:
 
-### 🎯 **Quick Start - Full ML Pipeline Ready!**
+- **Do the assistants mention you?** Mention rate per assistant, per question, over time.
+- **How do they rank you?** Position in recommendation lists, and whether you are actively recommended.
+- **What do they say?** Sentiment and the concrete claims made about you (prices, features, weaknesses), so you can spot wrong information.
+- **Who wins instead?** Share of voice against your competitors.
+- **Which sources shape the answers?** The websites the assistants cite. These are the places to improve your presence.
+
+> **Status (November 2026):** early stage. The visibility monitor backend works and has tests, with Claude as the first assistant. The dashboard UI for it, more assistants, scheduling and alerts are next (see [Roadmap](#roadmap)).
+
+---
+
+## How it works
+
+```
+Tracked prompts ──► AI assistants ──────► Answer + cited sources
+("Best CRM for     (Claude with web        │
+ startups?")        search; more coming)   ▼
+                                     Rule-based detection ── brand mentioned? order? competitors?
+                                           │ (only if mentioned)
+                                           ▼
+                                     LLM judge (structured output) ── recommended? list rank?
+                                           │                          sentiment? claims?
+                                           ▼
+                                     Stored run ──► Summary: mention rate, share of voice,
+                                                    sentiment, top sources, per assistant
+```
+
+- **Detection is deterministic.** Whether the brand appears is decided by name/alias matching, not by an LLM, so the core metric can't be hallucinated.
+- **The judge only runs when the brand is mentioned**, which keeps costs down.
+- **Each run is stored with the full answer**, so every number can be traced back to what the assistant actually said.
+
+## Quick start (local development)
+
+Requirements: Python 3.12, Node 22, an [Anthropic API key](https://platform.claude.com/) for live runs.
 
 ```bash
-# Backend with ML (Terminal 1)
+# Backend
 cd backend
-pip install fastapi uvicorn sqlalchemy aiosqlite transformers torch
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m venv .venv && .venv/Scripts/activate      # Windows; on macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env    # then set DEBUG=true, ADMIN_EMAIL, ADMIN_PASSWORD, ANTHROPIC_API_KEY
+python -c "import asyncio; from app.core.init_db import init_database; asyncio.run(init_database())"
+uvicorn app.main:app --reload --port 8000          # API docs: http://localhost:8000/docs (DEBUG only)
+pytest                                             # 17 tests, no API calls
 
-# Frontend (Terminal 2)
+# Frontend
 cd frontend
-npm install
-npm run dev
-
-# ML Demo (Terminal 3)
-python simple_ml_demo.py
-
-# Access Points:
-# 🌐 Dashboard: http://localhost:3000
-# 📡 API Docs: http://localhost:8000/docs
-# 🤖 ML Endpoints: http://localhost:8000/ml/status
-# 💾 Sample Data: http://localhost:8000/api/demo/sample-data
-# 🧪 ML Demo: http://localhost:8000/ml/test/demo
+npm ci
+npm run dev                                        # http://localhost:3000
 ```
 
-## 📁 Project Structure (Current Implementation)
-
-```
-brand-intelligence-platform/
-├── backend/                          # Python FastAPI Backend
-│   ├── app/
-│   │   ├── __init__.py              # odule initialization
-│   │   ├── main.py                  # FastAPI app with CORS & ML routes
-│   │   ├── core/                    # Core Configuration
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py            # Settings with SQLite support
-│   │   │   ├── database.py          # SQLAlchemy async engine
-│   │   │   └── init_db.py           # Database initialization
-│   │   ├── api/                     # API Router Modules
-│   │   │   ├── __init__.py
-│   │   │   ├── analytics.py         # Analytics endpoints
-│   │   │   ├── brands.py            # Brand management API
-│   │   │   ├── mentions.py          # Mention data API
-│   │   │   ├── demo.py              # Demo data endpoints
-│   │   │   └── ml.py                # 🤖 ML Pipeline API (9 endpoints)
-│   │   ├── services/                # Business Logic Services
-│   │   │   ├── __init__.py
-│   │   │   ├── ml_service.py        # 🧠 Core ML Service orchestrator
-│   │   │   ├── data_ingestion.py    # Data collection services
-│   │   │   └── notification.py     # Alert and notification system
-│   │   ├── ml/                      # 🤖 Machine Learning Components
-│   │   │   ├── __init__.py
-│   │   │   ├── sentiment/           # Sentiment Analysis Models
-│   │   │   │   ├── analyzer.py      # Keyword-based sentiment analyzer
-│   │   │   │   ├── bert_analyzer.py # BERT transformer model
-│   │   │   │   └── crisis_detector.py # Crisis detection algorithm
-│   │   │   ├── preprocessing/       # Text Processing Pipeline
-│   │   │   │   └── text_cleaner.py  # Text preprocessing utilities
-│   │   │   └── models/              # ML Model Storage
-│   │   │       └── (BERT models cached here)
-│   │   ├── models/                  # Database Models
-│   │   │   ├── __init__.py
-│   │   │   ├── brand.py             # Brand model (SQLite compatible)
-│   │   │   ├── mention.py           # Mention model with sentiment
-│   │   │   └── user.py              # User management model
-│   │   └── schemas/                 # Pydantic Data Schemas
-│   │       ├── __init__.py
-│   │       ├── brand.py             # Brand API schemas
-│   │       └── mention.py           # Mention API schemas
-│   │       └── mention.py           # Mention model with sentiment
-│   ├── brand_intelligence.db        # SQLite database file
-│   ├── test_ml_complete.py          # 🧪 ML pipeline comprehensive test
-│   ├── test_ml_service.py           # 🔬 ML service unit tests
-│   └── .env                         # Environment configuration
-│
-├── simple_ml_demo.py                # 🚀 Quick ML demo script
-├── demo_ml_api.py                   # 📡 Complete API demonstration
-├── ML_IMPLEMENTATION_SUMMARY.md     # 📖 Detailed ML implementation docs
-│
-├── frontend/                        # Next.js React Frontend
-│   ├── app/                         # App Router structure
-│   │   ├── layout.tsx               # Root layout with fonts
-│   │   └── page.tsx                 # Dashboard main page
-│   ├── src/
-│   │   ├── app.tsx                  # Dashboard component
-│   │   ├── components/              # UI Components
-│   │   │   └── layout/
-│   │   │       └── DashboardLayout.tsx
-│   │   ├── services/                # API Services
-│   │   │   └── api.ts
-│   │   └── globals.css              # TailwindCSS styles
-│   ├── package.json                 # Dependencies
-│   └── tsconfig.json                # TypeScript config
-│
-├── scripts/                         # 🔧 Development Scripts
-│   └── dev.bat                      # Windows development commands
-├── infrastructure/                  # 🔧 Docker & DevOps (ready for scaling)
-│   └── docker/
-│       ├── docker-compose.yml
-│       └── docker-compose.dev.yml
-├── Makefile                         # 🔧 Development commands
-└── README.md                        # 📖 This file
-```
-
-### **API Endpoints** 🔌
+### Try the visibility monitor
 
 ```bash
-# Core API Endpoints
-GET /                           # API status and version
-GET /health                     # Health check
-GET /api/brands                 # List all brands
-GET /api/mentions               # Recent mentions (limit 10)
-GET /api/demo/sample-data       # Complete demo dataset
+# 1. Log in (returns a bearer token, valid 30 minutes)
+curl -X POST localhost:8000/auth/token -d "username=$ADMIN_EMAIL&password=$ADMIN_PASSWORD"
 
-# 🤖 ML Pipeline Endpoints (9 total)
-GET  /ml/status                 # ML service status and health
-POST /ml/analyze/sentiment      # Single text sentiment analysis
-POST /ml/analyze/crisis         # Crisis detection for mentions
-POST /ml/analyze/brand-health   # Comprehensive brand health analysis
-POST /ml/analyze/batch          # Batch analysis of multiple mentions
-GET  /ml/analyze/realtime/{brand} # Real-time streaming analysis
-POST /ml/process/mention        # Process new mention through ML pipeline
-GET  /ml/test/demo              # Demo ML analysis with sample data
-POST /ml/extract/features       # Extract text features and keywords
+# 2. Tell it who the brand is and who to compare against
+curl -X PUT localhost:8000/visibility/brands/$BRAND_ID/config -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"aliases": ["TechCorp GmbH"], "competitors": ["Salesforce", "HubSpot", "Pipedrive"]}'
+
+# 3. Add the questions your customers ask
+curl -X POST localhost:8000/visibility/brands/$BRAND_ID/prompts -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" -d '{"text": "What is the best CRM for a small company in Germany?"}'
+
+# 4. Run (in the background; costs API credits) and read the results
+curl -X POST localhost:8000/visibility/brands/$BRAND_ID/run     -H "Authorization: Bearer $TOKEN"
+curl         localhost:8000/visibility/brands/$BRAND_ID/summary -H "Authorization: Bearer $TOKEN"
 ```
 
-### **Database Schema** 💾
-
-```sql
--- SQLite Tables (Auto-created)
-brands (
-    id VARCHAR PRIMARY KEY,           -- UUID as string
-    name VARCHAR NOT NULL,            -- Brand name
-    industry VARCHAR,                 -- Industry sector
-    website VARCHAR,                  -- Website URL
-    is_active BOOLEAN DEFAULT TRUE,   -- Active status
-    created_at DATETIME,              -- Timestamp
-    updated_at DATETIME               -- Last update
-)
-
-mentions (
-    id VARCHAR PRIMARY KEY,           -- UUID as string
-    brand_id VARCHAR,                 -- Foreign key to brands
-    content VARCHAR,                  -- Mention text
-    platform VARCHAR,                 -- Social platform
-    sentiment_score FLOAT,            -- 0.0 to 1.0 sentiment
-    sentiment_label VARCHAR,          -- positive/negative/neutral
-    crisis_probability FLOAT,         -- Crisis risk score
-    published_at DATETIME,            -- Original publish time
-    likes_count INTEGER,              -- Engagement metrics
-    shares_count INTEGER,
-    comments_count INTEGER,
-    created_at DATETIME               -- Record creation
-)
-```
-
-## 🛠️ **Technology Stack (Currently Implemented)**
-
-### **Backend Stack** 🔧
-
-- **FastAPI**: High-performance async Python API framework with 13 endpoints
-- **SQLAlchemy**: Async ORM with SQLite support
-- **Pydantic**: Data validation and settings management
-- **SQLite**: Lightweight database (easily upgradeable to PostgreSQL)
-- **AsyncIO**: Asynchronous request handling and ML processing
-- **CORS**: Cross-origin resource sharing for frontend
-
-### **🤖 ML Stack** 🧠
-
-- **Transformers**: Hugging Face transformers library for BERT models
-- **PyTorch**: Deep learning framework for BERT inference
-- **BERT Model**: nlptown/bert-base-multilingual-uncased-sentiment (669MB)
-- **Crisis Detection**: Custom keyword-based algorithm with threshold scoring
-- **Text Processing**: Advanced feature extraction and preprocessing
-- **Async ML**: Concurrent sentiment analysis and crisis detection
-
-### **Frontend Stack** 🎨
-
-- **Next.js 15**: React framework with App Router
-- **TypeScript**: Type-safe JavaScript development
-- **TailwindCSS**: Utility-first CSS framework
-- **React Hooks**: State management with useState/useEffect
-- **Responsive Design**: Mobile-first interface
-
-## 🗺️ **Development Roadmap**
-
-### **✅ Phase 1: Foundation (COMPLETED)**
+For regular tracking, schedule the runner daily (cron, Windows Task Scheduler):
 
 ```bash
-✅ Docker development environment setup
-✅ SQLite database with sample data
-✅ FastAPI backend with async endpoints
-✅ Next.js dashboard with real-time data
-✅ Basic sentiment analysis display
-✅ Working API-Frontend communication
+cd backend && python -m app.services.visibility.runner            # all brands with active prompts
 ```
 
-### **✅ Phase 2: ML Pipeline (COMPLETED)**
+## API
+
+All endpoints except `/` and `/health` require a bearer token (`POST /auth/token`) or the service key (`X-API-Key`).
+
+| Area | Endpoint | Role |
+|---|---|---|
+| Auth | `POST /auth/token`, `GET /auth/me` | any |
+| | `GET/POST /auth/users`, `POST /auth/users/{id}/deactivate` | admin |
+| **AI visibility** | `GET/PUT /visibility/brands/{id}/config` (aliases, competitors) | read: any · write: admin, analyst |
+| | `GET/POST /visibility/brands/{id}/prompts`, `DELETE .../prompts/{prompt_id}` | read: any · write: admin, analyst |
+| | `POST /visibility/brands/{id}/run` | admin, analyst |
+| | `GET /visibility/brands/{id}/runs`, `GET /visibility/brands/{id}/summary?days=30` | any |
+| Brands & mentions | `GET /api/brands`, `GET /api/mentions`, `POST /` (create brand) | create: admin, analyst |
+| Legacy sentiment ML | `/ml/*` (BERT sentiment, keyword crisis detection) | any |
+
+## Configuration
+
+Set in `backend/.env` (see `backend/.env.example`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | (none) | Needed for live visibility runs |
+| `VISIBILITY_MODEL` | `claude-opus-5-5` | The assistant whose answers are monitored |
+| `VISIBILITY_JUDGE_MODEL` | `claude-opus-5-5` | Analyses the answers. `claude-haiku-5-5` costs far less, so test whether quality holds |
+| `VISIBILITY_WEB_SEARCH` | `true` | Let the assistant search the web, like the consumer apps do |
+| `VISIBILITY_MAX_PROMPTS` | `50` | Active prompts per brand (each one costs credits on every run) |
+| `SECRET_KEY`, `API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ORIGINS` | | Security, see `.env.example` |
+
+**Cost:** each run asks every active prompt once per assistant, plus one judge call when the brand is mentioned. With web search on, search usage is billed on top of tokens. Start with a handful of prompts and check the bill before scaling up.
+
+## Security
+
+Login with roles (admin / analyst / viewer), JWT plus service API key, per-IP rate limiting, input limits, security headers, non-root containers, secrets only via environment, and a hardened production compose (`infrastructure/docker/docker-compose.prod.yml`). Details are in the commit history from November 2026.
+
+## Production (Docker)
 
 ```bash
-✅ Advanced NLP preprocessing pipeline
-✅ BERT-based sentiment analysis model (nlptown/bert-base-multilingual-uncased-sentiment)
-✅ Crisis detection algorithm with multi-level classification
-✅ Real-time ML data processing with async operations
-✅ ML service orchestration with error handling
-✅ Comprehensive testing framework
+cp infrastructure/docker/.env.example infrastructure/docker/.env   # fill in all values
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+docker compose -f infrastructure/docker/docker-compose.prod.yml exec backend \
+  python -c "import asyncio; from app.core.init_db import init_database; asyncio.run(init_database())"
 ```
 
-### **✅ Phase 3: Real-time ML Integration (COMPLETED)**
+Backend and frontend listen on `127.0.0.1` only. Put a reverse proxy with HTTPS in front and set `FORWARDED_ALLOW_IPS` to the proxy's IP.
 
-```bash
-✅ 9 ML API endpoints operational
-✅ Sentiment analysis (keyword + BERT hybrid)
-✅ Crisis detection with threat level assessment
-✅ Brand health scoring algorithm
-✅ Batch processing for multiple mentions
-✅ Real-time streaming analysis capability
-✅ Feature extraction and text analysis
-✅ Production-ready ML pipeline with fallbacks
-✅ Interactive API documentation
-```
-
-### **🔄 Phase 4: Frontend ML Integration (IN PROGRESS)**
-
-```bash
-🔄 Dashboard integration with ML endpoints
-🔄 Real-time sentiment visualization
-🔄 Crisis alert system with notifications
-🔄 Brand health metrics dashboard
-🔄 Live sentiment trend charts
-🔄 Crisis detection monitoring interface
-```
-
-### **📋 Phase 5: Production Enhancement (PLANNED)**
-
-```bash
-📋 PostgreSQL migration for production
-📋 Real social media data ingestion
-📋 Advanced ML model training pipeline
-📋 Performance optimization and caching
-📋 User authentication & authorization
-📋 Multi-brand comparison analytics
-```
-
-### **🚀 Phase 6: Scale & Deploy (FUTURE)**
-
-```bash
-🚀 Kubernetes deployment manifests
-🚀 CI/CD pipeline with GitHub Actions
-🚀 Monitoring with Prometheus/Grafana
-🚀 ML model versioning with MLflow
-🚀 Security hardening & HTTPS
-🚀 Cloud deployment (AWS/GCP)
-```
-
-### **Current Data Pipeline Flow**
+## Project structure
 
 ```
-Text Input → ML Service → Analysis → Results → API Response → Dashboard
-     ↓           ↓          ↓         ↓          ↓          ↓
- "I love this!" → MLService → BERT+Keywords → positive(0.8) → JSON → React UI
- "URGENT Issue" → MLService → Crisis Detect → major(0.7) → Alert → Dashboard
+backend/
+  app/
+    api/            auth, visibility, brands, mentions, analytics, ml, demo
+    core/           config, database, security (JWT/roles), rate limiting, init_db
+    models/         user, brand, mention, visibility (config, tracked prompts, runs)
+    services/
+      visibility/   providers (AI assistants), analyzer (detection + judge), runner
+      ml_service.py legacy BERT sentiment + keyword crisis detection
+  tests/            pytest suite (auth, roles, limits, visibility end-to-end with fake assistants)
+frontend/           Next.js 15 dashboard (legacy sentiment views; visibility UI not built yet)
+infrastructure/     docker-compose for dev and production
 ```
 
-## 📄 License
+## Roadmap
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The 2025 plan (social media crisis monitoring with BERT) was built as a prototype, but real data ingestion was never connected. In November 2026 the project changed direction to **AI visibility monitoring**, a newer need that this codebase fits well.
+
+**Done**
+- ✅ Backend, database, auth with roles, rate limiting, hardened Docker setup
+- ✅ Visibility monitor: tracked prompts, Claude with web search, mention/rank/competitor detection, LLM judge, summary API
+- ✅ Test suite (17 tests, runs without API keys)
+
+**Next**
+1. **More assistants:** OpenAI (ChatGPT), Perplexity, Gemini, implemented as providers in `services/visibility/providers.py`. Comparing assistants is the core value.
+2. **Dashboard:** visibility overview, trend over time, per-prompt answer history, competitor comparison, top sources.
+3. **Scheduling and alerts:** daily runs, plus an email or Slack/Teams alert when the mention rate drops, a competitor overtakes you, or an assistant states something wrong.
+4. **Prompt suggestions:** generate the questions real customers ask, per industry and language (German first).
+5. **Stable measurements:** answers vary from run to run, so repeat each prompt several times and report rates with confidence ranges.
+6. **Engineering:** Postgres with Alembic migrations, CI with GitHub Actions, and dropping the 3 GB torch dependency once the legacy ML is retired.
+
+**Later:** multi-tenant accounts and billing, a public "AI visibility check" landing page as a lead magnet, recommendations on which sources to improve.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
