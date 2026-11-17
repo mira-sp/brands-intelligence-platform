@@ -8,6 +8,7 @@ alembic==1.12.1
 redis==5.0.1
 celery==5.3.4
 httpx==0.27.2
+aiosqlite==0.22.1
 
 # ML & NLP (Python 3.12 compatible)
 transformers==4.53.0
