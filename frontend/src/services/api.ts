@@ -82,7 +82,7 @@ class ApiService {
     return this.token;
   }
 
-  private request(path: string, init: RequestInit = {}): Promise<Response> {
+  request(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
     const token = this.getToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);

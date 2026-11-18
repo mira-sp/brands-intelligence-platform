@@ -154,11 +154,14 @@ async def start_run(brand_id: str, background_tasks: BackgroundTasks, db: AsyncS
 
 @router.get("/brands/{brand_id}/runs")
 async def list_runs(brand_id: str, limit: int = Query(50, ge=1, le=500),
-                    prompt_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+                    prompt_id: Optional[str] = None, provider: Optional[str] = Query(None, max_length=50),
+                    db: AsyncSession = Depends(get_db)):
     await _get_brand(db, brand_id)
     q = select(VisibilityRun).where(VisibilityRun.brand_id == brand_id)
     if prompt_id:
         q = q.where(VisibilityRun.prompt_id == prompt_id)
+    if provider:
+        q = q.where(VisibilityRun.provider == provider)
     runs = (await db.execute(q.order_by(VisibilityRun.created_at.desc()).limit(limit))).scalars().all()
     return [{
         "id": r.id, "prompt_id": r.prompt_id, "provider": r.provider, "model": r.model,
@@ -174,17 +177,13 @@ async def list_runs(brand_id: str, limit: int = Query(50, ge=1, le=500),
 async def summary(brand_id: str, days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)):
     """Headline numbers: how often AI assistants mention the brand, how well, and next to whom."""
     brand = await _get_brand(db, brand_id)
-    since = datetime.now(timezone.utc) - timedelta(days=days)
-    runs = (await db.execute(
-        select(VisibilityRun).where(VisibilityRun.brand_id == brand_id, VisibilityRun.created_at >= since,
-                                    VisibilityRun.error.is_(None))
-    )).scalars().all()
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+    runs = await _successful_runs(db, brand_id, since)
+    previous = await _successful_runs(db, brand_id, since - timedelta(days=days), until=since)
 
     total = len(runs)
     mentioned = [r for r in runs if r.brand_mentioned]
-
-    def rate(n: int, d: int) -> Optional[float]:
-        return round(n / d, 3) if d else None
 
     per_provider = defaultdict(lambda: {"runs": 0, "mentioned": 0})
     for r in runs:
@@ -205,6 +204,8 @@ async def summary(brand_id: str, days: int = Query(30, ge=1, le=365), db: AsyncS
         "period_days": days,
         "runs": total,
         "mention_rate": rate(len(mentioned), total),
+        # Same-length window right before this one, for "up/down x points" comparisons
+        "previous_mention_rate": rate(sum(1 for r in previous if r.brand_mentioned), len(previous)),
         "recommendation_rate": rate(sum(1 for r in runs if r.recommended), total),
         "avg_list_rank": round(sum(ranks) / len(ranks), 2) if ranks else None,
         "sentiment": dict(Counter(r.sentiment for r in mentioned)),
@@ -213,3 +214,87 @@ async def summary(brand_id: str, days: int = Query(30, ge=1, le=365), db: AsyncS
         "share_of_voice": {name: rate(n, voice_total) for name, n in voice.most_common()},
         "top_sources": [{"url": u, "count": n} for u, n in sources.most_common(10)],
     }
+
+
+@router.get("/brands/{brand_id}/trend")
+async def trend(brand_id: str, days: int = Query(90, ge=7, le=365), db: AsyncSession = Depends(get_db)):
+    """Weekly mention rate per assistant (and overall), oldest week first."""
+    await _get_brand(db, brand_id)
+    runs = await _successful_runs(db, brand_id, datetime.now(timezone.utc) - timedelta(days=days))
+
+    buckets: dict = defaultdict(lambda: defaultdict(lambda: [0, 0]))  # week -> provider -> [mentioned, runs]
+    for r in runs:
+        created = _as_utc(r.created_at)
+        week = (created - timedelta(days=created.weekday())).date()  # Monday of that week
+        for key in (r.provider, "__all__"):
+            buckets[week][key][0] += int(r.brand_mentioned)
+            buckets[week][key][1] += 1
+
+    providers = sorted({r.provider for r in runs})
+    return {
+        "providers": providers,
+        "weeks": [
+            {
+                "week": week.isoformat(),
+                "overall": rate(*buckets[week]["__all__"]),
+                "by_provider": {p: rate(*buckets[week][p]) if p in buckets[week] else None for p in providers},
+            }
+            for week in sorted(buckets)
+        ],
+    }
+
+
+@router.get("/brands/{brand_id}/matrix")
+async def matrix(brand_id: str, days: int = Query(30, ge=1, le=365), db: AsyncSession = Depends(get_db)):
+    """Question x assistant grid: mention rate per cell plus the latest answer's headline facts."""
+    await _get_brand(db, brand_id)
+    prompts = (await db.execute(
+        select(TrackedPrompt).where(TrackedPrompt.brand_id == brand_id, TrackedPrompt.is_active.is_(True))
+        .order_by(TrackedPrompt.created_at)
+    )).scalars().all()
+    runs = await _successful_runs(db, brand_id, datetime.now(timezone.utc) - timedelta(days=days))
+
+    cells: dict = defaultdict(list)
+    for r in runs:
+        cells[(r.prompt_id, r.provider)].append(r)
+    providers = sorted({r.provider for r in runs})
+
+    rows = []
+    for p in prompts:
+        row_cells = {}
+        for prov in providers:
+            cell_runs = sorted(cells.get((p.id, prov), []), key=lambda r: _as_utc(r.created_at))
+            if not cell_runs:
+                row_cells[prov] = None
+                continue
+            last = cell_runs[-1]
+            row_cells[prov] = {
+                "runs": len(cell_runs),
+                "mention_rate": rate(sum(r.brand_mentioned for r in cell_runs), len(cell_runs)),
+                "last_run_id": last.id,
+                "last_mentioned": last.brand_mentioned,
+                "last_list_rank": last.list_rank,
+                "last_sentiment": last.sentiment,
+            }
+        rows.append({"prompt_id": p.id, "text": p.text, "cells": row_cells})
+    return {"providers": providers, "rows": rows}
+
+
+# --- helpers -------------------------------------------------------------------
+
+def rate(n: int, d: int) -> Optional[float]:
+    return round(n / d, 3) if d else None
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """SQLite returns naive datetimes (stored as UTC); Postgres returns aware ones."""
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+async def _successful_runs(db: AsyncSession, brand_id: str, since: datetime,
+                           until: Optional[datetime] = None) -> List[VisibilityRun]:
+    q = select(VisibilityRun).where(VisibilityRun.brand_id == brand_id, VisibilityRun.created_at >= since,
+                                    VisibilityRun.error.is_(None))
+    if until is not None:
+        q = q.where(VisibilityRun.created_at < until)
+    return list((await db.execute(q)).scalars().all())

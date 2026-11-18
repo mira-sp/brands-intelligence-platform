@@ -1,9 +1,9 @@
 // frontend/app/page.tsx
 'use client';
 
-import { DashboardLayout } from '../src/components/layout/DashboardLayout';
+import { DashboardLayout } from '../../src/components/layout/DashboardLayout';
 import { useEffect, useState } from 'react';
-import { apiService, Brand, Mention, AnalyticsOverview, CrisisAlert } from '../src/services/api';
+import { apiService, Brand, Mention, AnalyticsOverview, CrisisAlert } from '../../src/services/api';
 import { TrendingUp, TrendingDown, AlertTriangle, Users, MessageSquare, BarChart3, Zap } from 'lucide-react';
 
 export default function Dashboard() {

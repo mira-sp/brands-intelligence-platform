@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   Design tokens - neutral greys, white cards, colour reserved for the
+   four assistants. Assistant hues validated (dataviz validator, all-pairs)
+   against #f7f8fa (light card) and #17181b (dark card).
+   ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  color-scheme: light;
+  --paper: #e9ebee;
+  --paper-raised: #f6f7f9;
+  --ink: #111316;
+  --ink-2: #4b5058;
+  --ink-3: #868c95;
+  --rule: #dde0e5;
+  --rule-strong: #cdd1d8;
+  --wash: #eceef2;
+  --highlight: #fbefb5;
+  --good: #1b7f45;
+  --bad: #c0392b;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --s-chatgpt: #1f9a78;
+  --s-claude: #d1603d;
+  --s-gemini: #1d6fd1;
+  --s-perplexity: #b0479a;
+  --accent: #2b2e35;
+  --accent-ink: #f2f3ff;
+  --banner: #1f2126;
+  --banner-ink: #f1f2f4;
+  --banner-ink-2: #a2a7b0;
+
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --paper: #0c0d0f;
+    --paper-raised: #17181b;
+    --ink: #ecedef;
+    --ink-2: #a9adb4;
+    --ink-3: #757a83;
+    --rule: #25272b;
+    --rule-strong: #35383d;
+    --wash: #1f2125;
+    --highlight: #4a3f1e;
+    --good: #4cbf72;
+    --bad: #e2705f;
+
+    --s-chatgpt: #2aa883;
+    --s-claude: #de6a45;
+    --s-gemini: #3f86e8;
+    --s-perplexity: #c55aac;
+    --accent: #6a6fe0;
+    --accent-ink: #ffffff;
+    --banner: #23265c;
+    --banner-ink: #e6e7ff;
+    --banner-ink-2: #a5a9e8;
+
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0c0d0f;
+  --paper-raised: #17181b;
+  --ink: #ecedef;
+  --ink-2: #a9adb4;
+  --ink-3: #757a83;
+  --rule: #25272b;
+  --rule-strong: #35383d;
+  --wash: #1f2125;
+  --highlight: #4a3f1e;
+  --good: #4cbf72;
+  --bad: #e2705f;
+
+  --s-chatgpt: #2aa883;
+  --s-claude: #de6a45;
+  --s-gemini: #3f86e8;
+  --s-perplexity: #c55aac;
+  --accent: #6a6fe0;
+  --accent-ink: #ffffff;
+  --banner: #23265c;
+  --banner-ink: #e6e7ff;
+  --banner-ink-2: #a5a9e8;
+
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-wash: var(--wash);
+  --color-highlight: var(--highlight);
+  --color-good: var(--good);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-banner: var(--banner);
+  --color-banner-ink: var(--banner-ink);
+  --color-banner-ink-2: var(--banner-ink-2);
+  --color-bad: var(--bad);
+
+  --font-sans: var(--font-ui), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-code), ui-monospace, monospace;
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--highlight);
+}
+
+/* Quiet secondary label */
+.label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* Surface for KPI tiles and sections */
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 18, 22, 0.04);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
